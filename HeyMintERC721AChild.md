@@ -6,6 +6,10 @@ Here, I will try to explain the bug in the constructor.
 
 :warning: YOU SHOULD REALLY BE CAREFUL WITH DELEGATECALL :warning:
 
+My advice: be careful with inherited contracts in smart contract, and analyze every imported contract. 
+
+Here, the issue comes from the fact that an inherited contract modifier reads storage data that is not set by the HeyMintERC721AChild contract.
+
 ### Step 1 - Contract storage
 First, at the beginning of the contract, you define two variables that are constant:
 - _IMPLEMENTATION_SLOT
