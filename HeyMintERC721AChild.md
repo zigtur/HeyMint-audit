@@ -193,3 +193,6 @@ And so, it will always revert.
 **delegatecall** must be used carefully. Storage layout must be the same in both contract, to avoid some not controled behaviour.
 
 This Solidity-by-example does explain delegatecall: https://solidity-by-example.org/delegatecall/. 
+
+Jesper's video explain delegatecall: https://www.youtube.com/watch?v=BfzLR1Sscb4
+
