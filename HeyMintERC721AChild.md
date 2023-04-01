@@ -12,8 +12,8 @@ Here, the issue comes from the fact that an inherited contract modifier reads st
 
 ### Step 1 - Contract storage
 First, at the beginning of the contract, you define two variables that are constant:
-- _IMPLEMENTATION_SLOT
-- _ADDRESS_RELAY_SLOT
+- \_IMPLEMENTATION_SLOT
+- \_ADDRESS_RELAY_SLOT
 
 Constant variables will be replaced with real value at compilation, nothing will be stored in contract storage (For more info: see https://ethereum.stackexchange.com/questions/140628/where-are-the-smart-contract-constants-stored)
 
