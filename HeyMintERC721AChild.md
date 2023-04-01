@@ -11,7 +11,7 @@ First, at the beginning of the contract, you define two variables that are const
 - _IMPLEMENTATION_SLOT
 - _ADDRESS_RELAY_SLOT
 
-Constant variables will be replaced with real value at compilation, nothing will be stored in contract storage (For more info: see https://ethereum.stackexchange.com/questions/140628/where-are-the-smart-contract-constants-stored#:~:text=Constants%20in%20Solidity%20are%20not,sent%20to%20the%20Ethereum%20blockchain.)
+Constant variables will be replaced with real value at compilation, nothing will be stored in contract storage (For more info: see https://ethereum.stackexchange.com/questions/140628/where-are-the-smart-contract-constants-stored)
 
 So, contract storage will be 0 at index **0**. (This will be used later in the explanation!)
 
