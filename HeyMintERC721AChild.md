@@ -57,7 +57,7 @@ So, the `initialize` function from the `HeyMintERC721ABase` contract is called, 
 
 ### Step3 - __Ownable_init
 In the `initialize` function, the `__Ownable_init` function is called. This function does call the `onlyInitializing` modifier from the `Initializable` abstract contract. By looking at the `Initializable` contract, we can see some storage variables that are not set in our `HeyMintERC721AChild` contract. Those variables fit in 1 slot. Here are the variables:
-```
+```solidity
     /**
      * @dev Indicates that the contract has been initialized.
      * @custom:oz-retyped-from bool
@@ -86,7 +86,7 @@ Slot 0 :  0x9510a957257194aa443e30455db15cf6c788871ef8c8c59de5fbdc1e936fff4c
 #### initialize function from HeyMintERC721ABase contract
 I do import console.log in HeyMintERC721ABase contract and do log before each other function call.
 
-```
+```solidity
 import "hardhat/console.sol";
 
 /* ZIGTUR: HIDDEN CODE FOR READABILITY PURPOSES */
@@ -119,7 +119,7 @@ import "hardhat/console.sol";
 #### __Ownable_init function from OwnableUpgradeable contract
 Here, I try to log owner, but a modifier is called before.
 
-```
+```solidity
 import "hardhat/console.sol";
 
     /* ZIGTUR: HIDDEN CODE FOR READABILITY PURPOSES */
@@ -135,8 +135,8 @@ import "hardhat/console.sol";
 
 #### onlyInitializing modifier from Initializable contract
 I modified the `onlyInitializing` modifier from `Initializable` contract:
-```
 
+```solidity
 pragma solidity ^0.8.2;
 
 import "hardhat/console.sol";

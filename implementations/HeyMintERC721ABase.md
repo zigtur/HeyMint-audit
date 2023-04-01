@@ -27,7 +27,9 @@ Saved gas is not significant enough (~600 gas in average), but some gas seems to
 
 
 #### Gas-Optimized code
-```
+
+
+```solidity
 	/**
      * @notice Allow for public minting of tokens
      * @param _numTokens The number of tokens to mint
