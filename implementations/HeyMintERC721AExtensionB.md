@@ -2,6 +2,31 @@
 
 ## presaleMint
 
+### Vulnerability: attacker can mint presale
+*Note: This is not an only Solidity vulnerability.*
+
+At the beginning of the contract, a default presale signer address is set:
+
+```solidity
+    // Default HeyMint Launchpad presale signer address used to validate authorized presale mint addresses
+    address private constant defaultPresaleSignerAddress =
+        0xA85755fD92F91A1dD11Eba8A613121C6D2654BbE;
+```
+
+If this default signer is used for multiple instances (instanceA and instanceB), then with the actual code, presale signature will work on both instances A and B.
+
+Maybe you wanted to do signature with the default key from the HeyMint web server ?
+
+If so, an attacker could deploy his own HeyMint instance, then sign his attacker address with the amount of tokens he needs. Then, he will be able to presaleMint tokens on other contract instances.
+
+To avoid this behavior, there are multiple solutions:
+- add the contract address in the hash before signing
+- use a different presale key for each instance
+
+### Conclusion
+This point is essential. This type of attack could impact all deployed instances.
+
+
 ### Multiple Gas optimization
 See README Summary - On-chain read to get an explanation of the optimization.
 #### Initial state
