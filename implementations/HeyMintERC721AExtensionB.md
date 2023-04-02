@@ -13,14 +13,14 @@ At the beginning of the contract, a default presale signer address is set:
         0xA85755fD92F91A1dD11Eba8A613121C6D2654BbE;
 ```
 
-If this default signer is used for multiple instances (instanceA and instanceB), then with the actual code, presale signature will work on both instances A and B.
+If this default signer is used for multiple instances (instanceA and instanceB), then with the actual code, presale signature will work on both instances A and B. Because signature only include `hash(address + number of tokens)`.
 
 Maybe you wanted to do signature with the default key from the HeyMint web server ?
 
 If so, an attacker could deploy his own HeyMint instance, then sign his attacker address with the amount of tokens he needs. Then, he will be able to presaleMint tokens on other contract instances.
 
 To avoid this behavior, there are multiple solutions:
-- add the contract address in the hash before signing
+- add the contract address in the hash before signing, it the sign value would be: `hash(address + number of tokens)`
 - use a different presale key for each instance
 
 ### Conclusion
