@@ -1,17 +1,89 @@
 # HeyMintERC721ABase.sol
 
-## publicMint(uint256 _numTokens) external payable nonReentrant
+## initialize
+
+### startTime and endTime
+In the config, multiple checks are done. But if `publicSaleStartTime` is not set, then `publicSaleEndTime` will be ignored.
+
+As a NFT creator, this could be annoying. Maybe setting `publicSaleStartTime` as current timestamp may be better.
+
+If  `publicSaleStartTime` is set to current timestamp, then there must be a check that `publicSaleStartTime < publicSaleEndTime`.
+
+The same should apply to `presaleStartTime` and `presaleEndTime`.
+
+
+
+#### Ben's code proposition
+Talking with Ben, he did modify a little bit his code and send it to me:
+```solidity
+	/**
+     * @notice Initializes a new child deposit contract
+     * @param _name The name of the token
+     * @param _symbol The symbol of the token
+     * @param _config Base configuration settings
+     */
+    function initialize(
+        string memory _name,
+        string memory _symbol,
+        BaseConfig memory _config
+    ) public initializerERC721A {
+        __ERC721A_init(_name, _symbol);
+        __Ownable_init();
+        __ReentrancyGuard_init();
+        __OperatorFilterer_init(
+            _config.enforceRoyalties == true
+                ? CORI_SUBSCRIPTION_ADDRESS
+                : EMPTY_SUBSCRIPTION_ADDRESS,
+            true
+        );
+
+        HeyMintStorage.state().cfg = _config;
+
+        // If public sale start time is set but end time is not, set default end time
+        if (_config.publicSaleStartTime > 0 && _config.publicSaleEndTime == 0) {
+            HeyMintStorage.state().cfg.publicSaleEndTime =
+                _config.publicSaleStartTime +
+                520 weeks;
+        }
+
+        // If public sale end time is set but not start time, set default start time
+        if (_config.publicSaleEndTime > 0 && _config.publicSaleStartTime == 0) {
+
+            HeyMintStorage.state().cfg.publicSaleStartTime = uint32(
+                block.timestamp
+            );
+        }
+
+        // If presale start time is set but end time is not, set default end time
+        if (_config.presaleStartTime > 0 && _config.presaleEndTime == 0) {
+            HeyMintStorage.state().cfg.presaleEndTime =
+                _config.presaleStartTime +
+                520 weeks;
+        }
+
+        // If presale end time is set but not start time, set default start time
+        if (_config.presaleEndTime > 0 && _config.presaleStartTime == 0) {
+            HeyMintStorage.state().cfg.presaleStartTime = uint32(
+                block.timestamp
+            );
+        }
+    }
+```
+
+### Proposition review
+I think the `publicSaleStartTime < publicSaleEndTime` and `presaleStartTime < presaleEndTime`
+
+## publicMint
 
 ### Multiple Gas optimization
+See README Summary - On-chain read to get an explanation of the optimization.
 
 #### Initial state
 Without modifying Ben's code, the gas reporter is:
 
-
 |  Contract              |  Method              |  Min        |  Max        |  Avg          |  # calls      |
 |------------------------|----------------------|-------------|-------------|---------------|---------------|
 |  HeyMintERC721ABase    |  publicMint          |     118131  |     164976  |       137055  |           19  |
-
 
 
 #### Final state
@@ -26,7 +98,7 @@ After gas optimization, the gas reporter is:
 Saved gas is not significant enough (~600 gas in average), but some gas seems to have been saved without breaking the code.
 
 
-#### Gas-Optimized code
+#### Optimized Code
 
 
 ```solidity

@@ -1,16 +1,15 @@
+# HeyMintERC721AExtensionB.sol
 
 ## presaleMint
 
 ### Multiple Gas optimization
+See README Summary - On-chain read to get an explanation of the optimization.
 #### Initial state
 Without modifying Ben's code, the gas reporter is:
-
 
 |  Contract                  |  Method                                    |  Min        |  Max        |  Avg          |  # calls      |
 |----------------------------|--------------------------------------------|-------------|-------------|---------------|---------------|
 |  HeyMintERC721AExtensionB  |  presaleMint                                |         -  |     -  |       127778  |           2  |
-
-
 
 #### Final state
 After gas optimization, the gas reporter is:
@@ -23,6 +22,7 @@ After gas optimization, the gas reporter is:
 ### Conclusion
 Almost 1000 gas optimized per call. For 1000 users, this is 1_000_000 gas!
 
+#### Optimized Code
 
 ```solidity
 /**

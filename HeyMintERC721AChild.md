@@ -27,7 +27,7 @@ For the explanation, the two variables are defined like this:
     bytes32 internal _ADDRESS_RELAY_SLOT = keccak256("addressRelay");
 ```
 
-*Note: _ADDRESS_RELAY_SLOT is not defined as a constant*
+*Note: _ADDRESS_RELAY_SLOT is not defined as a constant, to get storage slot 0 not empty*
 
 Once deployed, we can read storage from contract:
 ```
@@ -45,14 +45,14 @@ If _ADDRESS_RELAY_SLOT was defined as constant, storage slot 0 would have value 
 ### Step 2 - Calling delegate call
 
 
-Then, the `initialize` function from the `HeyMintERC721ABase` contract, using DelegateCall.
+Then, the `initialize` function from the `HeyMintERC721ABase` contract is called, using DelegateCall.
 
 #### DelegateCall explanation
 The delegateCall does use a foreign contract function code, with the current contract storage. **THAT IS IMPORTANT TO UNDERSTAND THE ISSUE**
 
-As the following link explains, storage layout must be the same between the two contracts: https://solidity-by-example.org/delegatecall/
+As the following link explains, storage layout :warning: **must be the same** :warning: between the two contracts: https://solidity-by-example.org/delegatecall/
 
-So, the `initialize` function from the `HeyMintERC721ABase` contract is called, with the storage defined in Step 1 - Test preparation.
+So, the `initialize` function from the `HeyMintERC721ABase` contract is called, with the storage defined in Step 1 - Test preparation (not empty).
 
 
 ### Step3 - __Ownable_init
