@@ -2,10 +2,15 @@
 
 
 ## Summary
-## Storage layout issue
+### Storage layout issue
 As you used delegatecall from the HeyMintERC721AChild, you should be **absolutely sure** that the contracts that will be delegatecalled use the **SAME STORAGE LAYOUT**.
 
 That was not the case for the HeyMintERC721ABase `initialize` function. Explanation is given in `HeyMintERC721AChild.md` file.
+
+### ECDSA Presale default public key issue
+If the default public key is used for presale mint, then an attacker will be able to get presale mints in all deployed contracts.
+
+Explanation is given in `HeyMintERC721AExtensionB.md` file.
 
 ### Gas optimization
 Multiple gas optimization have been made. Here are the main gas optimization made:
