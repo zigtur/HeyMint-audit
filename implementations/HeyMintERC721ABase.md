@@ -70,8 +70,8 @@ Talking with Ben, he did modify a little bit his code and send it to me:
     }
 ```
 
-### Proposition review
-I think the `publicSaleStartTime < publicSaleEndTime` and `presaleStartTime < presaleEndTime`
+#### Proposition review
+I think the `publicSaleStartTime < publicSaleEndTime` and `presaleStartTime < presaleEndTime` checks are missing.
 
 ## publicMint
 

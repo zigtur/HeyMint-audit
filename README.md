@@ -12,6 +12,12 @@ If the default public key is used for presale mint, then an attacker will be abl
 
 Explanation is given in `HeyMintERC721AExtensionB.md` file.
 
+
+### startTime and endTime
+startTime and endTime are not properly handled. A check that startTime < endTime should be made, to avoid a DoS.
+
+Explanation is given in `HeyMintERC721ABase.md` file.
+
 ### Gas optimization
 Multiple gas optimization have been made. Here are the main gas optimization made:
 
