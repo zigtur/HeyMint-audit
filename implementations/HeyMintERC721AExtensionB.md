@@ -23,9 +23,93 @@ To avoid this behavior, there are multiple solutions:
 - add the contract address in the hash before signing, it the sign value would be: `hash(address + number of tokens)`
 - use a different presale key for each instance
 
-### Conclusion
+#### Conclusion of Vulnerability
 This point is essential. This type of attack could impact all deployed instances.
 
+#### Fix for Vulnerability
+```solidity
+    /**
+     * @notice Allow for allowlist minting of tokens
+     * @param _messageHash The hash of the message containing msg.sender & _maximumAllowedMints to verify
+     * @param _signature The signature of the messageHash to verify
+     * @param _numTokens The number of tokens to mint
+     * @param _maximumAllowedMints The maximum number of tokens that can be minted by the caller
+     */
+    function presaleMint(
+        bytes32 _messageHash,
+        bytes calldata _signature,
+        uint256 _numTokens,
+        uint256 _maximumAllowedMints
+    ) external payable nonReentrant {
+        BaseConfig storage cfg = HeyMintStorage.state().cfg;
+        require(cfg.presaleActive, "NOT_ACTIVE");
+        require(presaleTimeIsActive(), "NOT_ACTIVE");
+        require(
+            cfg.presaleMintsAllowedPerAddress == 0 ||
+                _numberMinted(msg.sender) + _numTokens <=
+                cfg.presaleMintsAllowedPerAddress,
+            "MAX_MINTS_EXCEEDED"
+        );
+        require(
+            cfg.presaleMintsAllowedPerTransaction == 0 ||
+                _numTokens <= cfg.presaleMintsAllowedPerTransaction,
+            "MAX_MINTS_EXCEEDED"
+        );
+        require(
+            _numberMinted(msg.sender) + _numTokens <= _maximumAllowedMints,
+            "MAX_MINTS_EXCEEDED"
+        );
+        require(
+            cfg.presaleMaxSupply == 0 ||
+                totalSupply() + _numTokens <= cfg.presaleMaxSupply,
+            "MAX_SUPPLY_EXCEEDED"
+        );
+        require(
+            totalSupply() + _numTokens <= cfg.maxSupply,
+            "MAX_SUPPLY_EXCEEDED"
+        );
+        uint256 presalePrice = presalePriceInWei();
+        if (cfg.heyMintFeeActive) {
+            uint256 heymintFee = _numTokens * heymintFeePerToken;
+            require(
+                msg.value == presalePrice * _numTokens + heymintFee,
+                "INVALID_PRICE_PAID"
+            );
+            (bool success, ) = heymintPayoutAddress.call{value: heymintFee}("");
+            require(success, "TRANSFER_FAILED");
+        } else {
+            require(
+                msg.value == presalePrice * _numTokens,
+                "INVALID_PRICE_PAID"
+            );
+        }
+        // ZIGTUR: HERE IS THE FIX
+        require(
+            keccak256(abi.encode(address(this), msg.sender, _maximumAllowedMints)) ==
+                _messageHash,
+            "MESSAGE_INVALID"
+        );
+        require(
+            verifySignerAddress(_messageHash, _signature),
+            "INVALID_SIGNATURE"
+        );
+
+        if (cfg.fundingDuration > 0) {
+            uint256 firstTokenIdToMint = _nextTokenId();
+            for (uint256 i = 0; i < _numTokens; i++) {
+                HeyMintStorage.state().data.pricePaid[
+                    firstTokenIdToMint + i
+                ] = presalePrice;
+            }
+        }
+
+        _safeMint(msg.sender, _numTokens);
+
+        if (totalSupply() >= cfg.presaleMaxSupply) {
+            cfg.presaleActive = false;
+        }
+    }
+```
 
 ### Multiple Gas optimization
 See README Summary - On-chain read to get an explanation of the optimization.
