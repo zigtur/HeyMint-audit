@@ -24,7 +24,7 @@ To avoid this behavior, there are multiple solutions:
 - use a different presale key for each instance
 
 #### Conclusion of Vulnerability
-This point is essential. This type of attack could impact all deployed instances.
+This point is essential. This type of attack could impact all deployed instances that are using presale mechanism.
 
 #### Fix for Vulnerability
 ```solidity
