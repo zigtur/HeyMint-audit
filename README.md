@@ -1,7 +1,13 @@
 # HeyMint Audit - Zigtur
 
+## HeyMint
+HeyMint project: https://heymint.xyz/
 
-## Summary
+"HeyMint is thrilled to create amazing no-code tools that help NFT creators & collectors do what they love. 100% free because we ♡ you."
+
+HeyMint is a project that aims to allow every creators to easily deploy their own NFT collection. Some advanced features like presale, royalties, loans will be included. A user will just have to set the config, by using a web interface.
+
+## Audit Summary
 ### Storage layout issue
 As you used delegatecall from the HeyMintERC721AChild, you should be **absolutely sure** that the contracts that will be delegatecalled use the **SAME STORAGE LAYOUT**.
 
