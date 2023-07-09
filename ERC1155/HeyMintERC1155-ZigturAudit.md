@@ -1,8 +1,10 @@
 # Introduction
 
+*MISSING CONTENT*
 
 # Disclaimer
 
+*MISSING CONTENT*
 
 # About Zigtur
 
