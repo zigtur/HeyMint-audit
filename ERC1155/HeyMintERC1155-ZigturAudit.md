@@ -11,6 +11,7 @@
 Zigtur is a cybersecurity professional. Graduated from a cyberdefense engineering school, he now focuses its efforts on smart contract auditing.
 
 Twitter: [@zigtur](https://twitter.com/zigtur)
+
 Discord: [@zigtur](https://discordapp.com/users/909209529558921276)
 
 
@@ -35,10 +36,10 @@ There are 4 types of actors:
 ## Vulnerability classification
 Only the impact will be studied in this audit.
 
-| Impact level            |  Explanation                                                                       | Example                 |
+| Impact level            |  Explanation                                                                       | Examples of impact            |
 |-------------------------|------------------------------------------------------------------------------------|-------------------------|
 | Critical                | This vulnerability would have a tremendous impact on HeyMint and all the creators. | All funds are getting stolen from all childs |
-| High                    | A lot of end-users are impacted by the vulnerability or multiple child contracts   | Malicious creator steals all funds by malicious behavior |
+| High                    | A lot of end-users are impacted by the vulnerability or multiple child contracts   | Malicious creator steals all funds by malicious behavior.<br /> Several presale users can't use their presales.<br />All the child contracts of a creator can be tricked by a vulnerability. |
 | Medium                  | Only a few end-users are impacted by the vulnerability.                            | A user can't mint its presale tokens |
 | Low                     | This has no impact on project, but would better be fixed before deployment         | Gas optimizations, not mandatory checks, ... |
 
@@ -53,31 +54,49 @@ When the fix is too heavy, no code proposal will be given. However, ways to solv
 
 **Vulnerability classification: High**
 
-A user with one presale on a creator contract could be able to mint on every other creator contracts.
+A user with one presale on a creator contract could be able to mint on every other contracts of this creator.
 
 ### Explanations
+A valid presale ticket (i.e. the message hash) is based on the user address, the maximumAllowedMints and the tokenId.
 
-*MISSING CONTENT*
+For practical reasons, the owner (i.e. the Creator actor) can use the same presale signer address for multiple childs. If so, a presale user of one of these childs will be able to presale mint on all the others.
+
+A presale ticket must also be based on the contract address on which it should be used.
+
 
 ### Vulnerable code
-
-*MISSING CONTENT*
+- File: `HeyMintERC1155ExtensionC.sol`
+- Function: `presaleMint`
+- Lines: `197-201`
+- Explanations: `_messageHash` used in signature must be based on `msg.sender`, `_maximumAllowedMints`, `_tokenId` AND the contract address. The contract address is missing.
+- Vulnerable code:
+```solidity
+        require(
+            keccak256(abi.encode(msg.sender, _maximumAllowedMints, _tokenId)) ==
+                _messageHash,
+            "MESSAGE_INVALID"
+        );
+```
 
 ### Vulnerability test
-
-*MISSING CONTENT*
+The unit test for this vulnerability can be found in `ZigturAudit.js`, under the name `Presale tickets can be reused on other childs, if owner uses same signer address`
 
 ### Solution
-
-*MISSING CONTENT*
-
 #### First solution
-
-*MISSING CONTENT*
+- This solution is the most user-friendly, as it allows creators to use the same signer address on multiple childs.
+- Explanations: `_messageHash` is now based on `msg.sender`, `_maximumAllowedMints`, `_tokenId` and `address(this)`.
+- Vulnerable code:
+```solidity
+        require(
+            keccak256(abi.encode(msg.sender, _maximumAllowedMints, _tokenId, address(this))) ==
+                _messageHash,
+            "MESSAGE_INVALID"
+        );
+```
 
 #### Second solution
-
-*MISSING CONTENT*
+- This solution is less user-friendly that the first one.
+- Explanations: Advertise owner in GUI and forbid the use of the same signer address on multiple childs.
 
 ## Presale users can lose presale mints because of other users
 *Note: This vulnerability holds if presale minting period overlaps with normal minting period. As no checks are done in public mint functions to verify overlapping, this is considered as valid.*
@@ -127,6 +146,67 @@ Another way to fix the issue is by not overlapping presale mint and public mint 
 
 It is worth saying that this solution **is not** the most user-friendly one.
 
+
+
+## Users can max out tokenPublicMintsAllowedPerAddress by using creditCardMint
+
+**Vulnerability classification: High**
+
+### Explanations
+In the `creditCardMint` function, a check is done to verify that the address to which tokens will be minted is less or equal than tokensMintedByAddress.
+
+The problem is that when tokens are minted in this function, it is the creditCardAddress's tokensMintedByAddress field that is increased (i.e. the `msg.sender` here), and not the user's tokensMintedByAddress field (i.e. the `_to` address in this function).
+
+So, user can mint more than the tokensMintedByAddress limit using creditCard by buying multiple times (multiple transactions).
+
+### Vulnerable code
+- File: `HeyMintERC1155ExtensionE.sol`
+- Function: `creditCardMint`
+- Lines: `160`
+- Explanations: `state.data.tokensMintedByAddress[msg.sender][_tokenId]` is increased. But `msg.sender` isn't really the minter. The minter should be `_to`.
+- Vulnerable code:
+```solidity
+        require(
+            state.tokens[_tokenId].publicMintsAllowedPerAddress == 0 ||
+                state.data.tokensMintedByAddress[_to][_tokenId] + _numTokens <=
+                state.tokens[_tokenId].publicMintsAllowedPerAddress,
+            "MAX_MINTS_EXCEEDED"
+        );
+
+        // ...
+
+        state.data.totalSupply[_tokenId] += _numTokens;
+        // Line 160 below
+        state.data.tokensMintedByAddress[msg.sender][_tokenId] += _numTokens;
+        _mint(_to, _tokenId, _numTokens, "");
+```
+
+### Vulnerability test
+The unit test for this vulnerability can be found in `ZigturAudit.js`, under the name `Users can max out tokenPublicMintsAllowedPerAddress by using creditCardMint`.
+
+### Solution
+- Explanations: Modify line `160` to increase mint balance of the `_to` address instead of the mint balance of the `msg.sender`.
+- Fixed code:
+```solidity
+        require(
+            state.tokens[_tokenId].publicMintsAllowedPerAddress == 0 ||
+                state.data.tokensMintedByAddress[_to][_tokenId] + _numTokens <=
+                state.tokens[_tokenId].publicMintsAllowedPerAddress,
+            "MAX_MINTS_EXCEEDED"
+        );
+
+        // ...
+
+        state.data.totalSupply[_tokenId] += _numTokens;
+        // line 160 fixed
+        state.data.tokensMintedByAddress[_to][_tokenId] += _numTokens;
+        _mint(_to, _tokenId, _numTokens, "");
+```
+
+
+
+## Presale users will not be able to mint all their publicMintsAllowedPerAddress
+**MISSING CONTENT**
 
 
 
@@ -195,62 +275,52 @@ Another way to fix the issue is by not overlapping presale mint and public mint 
 It is worth saying that this solution **is not** the most user-friendly one.
 
 
-## User can max out tokenPublicMintsAllowedPerAddress by using creditCardMint
 
-**Vulnerability classification: Medium**
+
+## Missing check in setTokenPresaleEndTime
+
+**Vulnerability classification: Low**
 
 ### Explanations
-In the `creditCardMint` function, a check is done to verify that the address to which tokens will be minted is less or equal than tokensMintedByAddress.
+Creator can set the end time of the presale using the `setTokenPresaleEndTime` function. But the function doesn't check that the end time is after the start time.
 
-The problem is that when tokens are minted in this function, it is the creditCardAddress's tokensMintedByAddress field that is increased (i.e. the `msg.sender` here), and not the user's tokensMintedByAddress field (i.e. the `_to` address in this function).
-
-So, user can mint more than the tokensMintedByAddress limit using creditCard by buying multiple times (multiple transactions).
+A check must be set to avoid a misconfiguration from creator.
 
 ### Vulnerable code
-- File: `HeyMintERC1155ExtensionE.sol`
-- Function: `creditCardMint`
-- Lines: `160`
-- Explanations: `state.data.tokensMintedByAddress[msg.sender][_tokenId]` is increased. But `msg.sender` isn't really the minter. The minter should be `_to`.
+- File: `HeyMintERC1155ExtensionC.sol`
+- Function: `setTokenPresaleEndTime`
+- Lines: `108-115`
+- Explanations: A check that `state.tokens[_tokenId].presaleStartTime < _presaleEndTime` is missing.
 - Vulnerable code:
 ```solidity
-        require(
-            state.tokens[_tokenId].publicMintsAllowedPerAddress == 0 ||
-                state.data.tokensMintedByAddress[_to][_tokenId] + _numTokens <=
-                state.tokens[_tokenId].publicMintsAllowedPerAddress,
-            "MAX_MINTS_EXCEEDED"
-        );
-
-        // ...
-
-        state.data.totalSupply[_tokenId] += _numTokens;
-        // Line 160 below
-        state.data.tokensMintedByAddress[msg.sender][_tokenId] += _numTokens;
-        _mint(_to, _tokenId, _numTokens, "");
+    /**
+     * @notice Update the end time for public mint for a given token
+     */
+    function setTokenPresaleEndTime(
+        uint16 _tokenId,
+        uint32 _presaleEndTime
+    ) external onlyOwner {
+        HeyMintStorage.State storage state = HeyMintStorage.state();
+        require(_presaleEndTime > block.timestamp, "TIME_IN_PAST");
+        state.tokens[_tokenId].presaleEndTime = _presaleEndTime;
+    }
 ```
-
-### Vulnerability test
-The unit test for this vulnerability can be found in `ZigturAudit.js`, under the name `User can max out tokenPublicMintsAllowedPerAddress by using creditCardMint`.
 
 ### Solution
-- Explanations: Modify line `160` to increase mint balance of the `_to` address instead of the mint balance of the `msg.sender`.
+- Explanations: A require statement that `state.tokens[_tokenId].presaleStartTime < _presaleEndTime` has been added.
 - Fixed code:
 ```solidity
-        require(
-            state.tokens[_tokenId].publicMintsAllowedPerAddress == 0 ||
-                state.data.tokensMintedByAddress[_to][_tokenId] + _numTokens <=
-                state.tokens[_tokenId].publicMintsAllowedPerAddress,
-            "MAX_MINTS_EXCEEDED"
-        );
-
-        // ...
-
-        state.data.totalSupply[_tokenId] += _numTokens;
-        // line 160 fixed
-        state.data.tokensMintedByAddress[_to][_tokenId] += _numTokens;
-        _mint(_to, _tokenId, _numTokens, "");
+    /**
+     * @notice Update the end time for public mint for a given token
+     */
+    function setTokenPresaleEndTime(
+        uint16 _tokenId,
+        uint32 _presaleEndTime
+    ) external onlyOwner {
+        HeyMintStorage.State storage state = HeyMintStorage.state();
+        require(_presaleEndTime > block.timestamp, "TIME_IN_PAST");
+        require(state.tokens[_tokenId].presaleStartTime < _presaleEndTime, "END_TIME_BEFORE_START_TIME");
+        state.tokens[_tokenId].presaleEndTime = _presaleEndTime;
+    }
 ```
-
-
-
-
 
