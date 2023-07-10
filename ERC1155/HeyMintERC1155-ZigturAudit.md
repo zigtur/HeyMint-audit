@@ -1,10 +1,8 @@
 # Introduction
-
-*MISSING CONTENT*
+The **HeyMint** ERC1155 implementation was audited by **Zigtur**. This implementation will allow creators to easily create token collections using HeyMint GUI.
 
 # Disclaimer
-
-*MISSING CONTENT*
+A smart contract security review can never verify the complete absence of vulnerabilities. This is a time, resource and expertise bound effort where I try to find as many vulnerabilities as possible. I can not guarantee 100% security after the review or even if the review will find any problems with your smart contracts. Subsequent security reviews, bug bounty programs and on-chain monitoring are strongly recommended.
 
 # About Zigtur
 
@@ -43,14 +41,31 @@ Only the impact will be studied in this audit.
 | Medium                  | Only a few end-users are impacted by the vulnerability.                            | A user can't mint its presale tokens |
 | Low                     | This has no impact on project, but would better be fixed before deployment         | Gas optimizations, not mandatory checks, ... |
 
+## Vulnerability unit test
+The file `ZigturAudit.js` is a unit tests file in which almost all the vulnerabilities can be tested.
+
+This [file](ZigturAudit.js) should work out-of-the-box, just copy-paste it in the `test/` folder, and run `npx hardhat test`.
+
 ## Solutions
 Solutions can be given in the following audit. Some of them can be done easily, and so a fixed code will be given.
 
 When the fix is too heavy, no code proposal will be given. However, ways to solve the issue will be detailed to help HeyMint team fixing the issue.
 
+# Summary
+
+| Vulnerability classification      |  Vulnerability name                      |
+|--------------------------------------|------------------------------------------|
+| HIGH                              | [Presale tickets can be reused on other childs, if owner uses same signer address](#high---presale-tickets-can-be-reused-on-other-childs-if-owner-uses-same-signer-address)   |
+| HIGH                              | [Presale users can lose presale mints because of other users](#high---presale-users-can-lose-presale-mints-because-of-other-users)   |
+| HIGH                              | [Users can max out tokenPublicMintsAllowedPerAddress by using creditCardMint](#high---users-can-max-out-tokenpublicmintsallowedperaddress-by-using-creditcardmint)   |
+| HIGH                              | [Presale users will not be able to mint all their public mint tokens](#high---presale-users-will-not-be-able-to-mint-all-their-public-mint-tokens)   |
+| HIGH                              | [Token metadata can be changed even if allMetadataFrozen is true](#high---token-metadata-can-be-changed-even-if-allmetadatafrozen-is-true)   |
+| MEDIUM                            | [Presale users can lose presale mints, if they use normal mint](#medium---presale-users-can-lose-presale-mints-if-they-use-normal-mint)   |
+| LOW                               | [Missing check in setTokenPresaleEndTime](#low---missing-check-in-settokenpresaleendtime)   |
+
 # Findings
 
-## Presale tickets can be reused on other childs, if owner uses same signer address
+## HIGH - Presale tickets can be reused on other childs, if owner uses same signer address
 
 **Vulnerability classification: High**
 
@@ -98,7 +113,7 @@ The unit test for this vulnerability can be found in `ZigturAudit.js`, under the
 - This solution is less user-friendly that the first one.
 - Explanations: Advertise owner in GUI and forbid the use of the same signer address on multiple childs.
 
-## Presale users can lose presale mints because of other users
+## HIGH - Presale users can lose presale mints because of other users
 *Note: This vulnerability holds if presale minting period overlaps with normal minting period. As no checks are done in public mint functions to verify overlapping, this is considered as valid.*
 
 **Vulnerability classification: High**
@@ -135,6 +150,7 @@ Multiple unit tests for this vulnerability can be found in `ZigturAudit.js`, und
 
 ### Solution
 #### First solution
+**Note: This solution requires to modify HeyMintStorage library.**
 One way to solve the problem is to:
 - Add a `presaleTotalSupply` field, to keep track of how many tokens were minted using presales
 - Add a `presaleTokensMintedByAddress` field, to keep track of how many presale tokens were minted by user
@@ -148,7 +164,7 @@ It is worth saying that this solution **is not** the most user-friendly one.
 
 
 
-## Users can max out tokenPublicMintsAllowedPerAddress by using creditCardMint
+## HIGH - Users can max out tokenPublicMintsAllowedPerAddress by using creditCardMint
 
 **Vulnerability classification: High**
 
@@ -205,12 +221,74 @@ The unit test for this vulnerability can be found in `ZigturAudit.js`, under the
 
 
 
-## Presale users will not be able to mint all their publicMintsAllowedPerAddress
+## HIGH - Presale users will not be able to mint all their public mint tokens
+
+**Vulnerability classification: High**
+
+All presale users that presale minted tokens will be impacted by this vulnerability.
+
+### Explanations
+A presale user should be able to mint the allowed presale amount and the allowed public amount.
+
+During public mint, a check is made to verify that user didn't minted (presale or public) more than the public sale limit. As presale users have minted using presale mechanism, they will not be able to mint the whole allowed amount during public sale.
+
+### Vulnerable code
+- File: `HeyMintERC1155ExtensionB.sol`
+- Function: `mintToken`
+- Lines: `119-125`
+- Explanations: `state.data.tokensMintedByAddress[msg.sender][_tokenId]` is checked against `state.tokens[_tokenId].publicMintsAllowedPerAddress` in `mintToken` which is good. But this value can be increased by `presaleMint` and presale users will not be able to public mint the allowed amount `state.tokens[_tokenId].publicMintsAllowedPerAddress`.
+- Vulnerable code:
+```solidity
+        require(
+            state.tokens[_tokenId].publicMintsAllowedPerAddress == 0 ||
+                state.data.tokensMintedByAddress[msg.sender][_tokenId] +
+                    _numTokens <=
+                state.tokens[_tokenId].publicMintsAllowedPerAddress,
+            "MAX_MINTS_FOR_ADDRESS_EXCEEDED"
+        );
+```
+
+### Vulnerability test
+The unit test for this vulnerability can be found in `ZigturAudit.js`, under the name `Presale users will not be able to mint all their public mint tokens`.
+
+### Solution
+#### First solution
+**Note: This solution requires to modify HeyMintStorage library.**
+One way to solve the problem is to:
+- Add a `presaleTokensMintedByAddress` field, to keep track of how many presale tokens were minted by user
+- Modify a `tokensMintedByAddress` into `publicTokensMintedByAddress` field, to keep track of how many public sale tokens were minted by user
+- Modify checks in `mintToken()` to verify that the new `publicTokensMintedByAddress` is not greater than `state.tokens[_tokenId].publicMintsAllowedPerAddress`
+- Add the amount of minted tokens to `publicTokensMintedByAddress` when public minting
+
+#### Second solution
+Another way to fix the problem, which will bring less functionnalities, is the following:
+- Rename `publicMintsAllowedPerAddress` with `mintsAllowedPerAddress`
+- Do not keep track if mints were presale or public, just set a number of allowed mints
+
+
+
+## HIGH - Token metadata can be changed even if allMetadataFrozen is true
+
+**Vulnerability classification: High**
+
+This vulnerability is set as **high** because the owner could trick all its users.
+### Explanations
+
+**MISSING CONTENT**
+
+### Vulnerable code
+
+**MISSING CONTENT**
+
+### Vulnerability test
+The unit test for this vulnerability can be found in `ZigturAudit.js`, under the name `Token metadata can be changed even if allMetadataFrozen is true`.
+
+### Solution
 **MISSING CONTENT**
 
 
 
-## Presale users can lose presale mints, if they use normal mint
+## MEDIUM - Presale users can lose presale mints, if they use normal mint
 *Note: This vulnerability holds if presale minting period overlaps with normal minting period. As no checks are done in mintToken() to verify overlapping, this is considered as valid.*
 
 **Vulnerability classification: Medium**
@@ -277,7 +355,7 @@ It is worth saying that this solution **is not** the most user-friendly one.
 
 
 
-## Missing check in setTokenPresaleEndTime
+## LOW - Missing check in setTokenPresaleEndTime
 
 **Vulnerability classification: Low**
 
