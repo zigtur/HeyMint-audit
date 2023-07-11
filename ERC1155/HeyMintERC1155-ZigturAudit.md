@@ -39,7 +39,7 @@ Only the impact will be studied in this audit.
 | Critical                | This vulnerability would have a tremendous impact on HeyMint and all the creators. | All funds are getting stolen from all childs |
 | High                    | A lot of end-users are impacted by the vulnerability or multiple child contracts   | Malicious creator steals all funds by malicious behavior.<br /> Several presale users can't use their presales.<br />All the child contracts of a creator can be tricked by a vulnerability. |
 | Medium                  | Only a few end-users are impacted by the vulnerability.                            | A user can't mint its presale tokens |
-| Low                     | This has no impact on project, but would better be fixed before deployment         | Gas optimizations, not mandatory checks, ... |
+| Low                     | This has no impact on project, but would better be fixed before deployment         | Gas optimizations, not mandatory checks, missing functionnalities... |
 
 ## Vulnerability unit test
 The file `ZigturAudit.js` is a unit tests file in which almost all the vulnerabilities can be tested.
@@ -62,6 +62,8 @@ When the fix is too heavy, no code proposal will be given. However, ways to solv
 | HIGH                              | [Token metadata can be changed even if allMetadataFrozen is true](#high---token-metadata-can-be-changed-even-if-allmetadatafrozen-is-true)   |
 | MEDIUM                            | [Presale users can lose presale mints, if they use normal mint](#medium---presale-users-can-lose-presale-mints-if-they-use-normal-mint)   |
 | LOW                               | [Missing check in setTokenPresaleEndTime](#low---missing-check-in-settokenpresaleendtime)   |
+| LOW                               | [A token configuration locking mechanism is missing](#low---a-token-configuration-locking-mechanism-is-missing)   |
+| LOW                               | [HeyMint fees must be paid even if those fees are not used](#low---heymint-fees-must-be-paid-even-if-those-fees-are-not-used)   |
 
 # Findings
 
@@ -272,19 +274,40 @@ Another way to fix the problem, which will bring less functionnalities, is the f
 **Vulnerability classification: High**
 
 This vulnerability is set as **high** because the owner could trick all its users.
+
 ### Explanations
 
-**MISSING CONTENT**
+A locking mechanism has been put in place to freeze all tokens metadata.
+
+But, this locking mechanism can be tricked by using the function that insert and/or update token configurations.
 
 ### Vulnerable code
-
-**MISSING CONTENT**
+- File: `HeyMintERC1155ExtensionD.sol`
+- Function: `upsertToken`
+- Lines: `169-173`
+- Explanations: `state.data.allMetadataFrozen` will be ignored if `state.data.tokenMetadataFrozen[_tokenConfig.tokenId]` is not set, because of the logical OR `||` operator in the require statement.
+- Vulnerable code:
+```solidity
+        require(
+            !state.data.tokenMetadataFrozen[_tokenConfig.tokenId] ||
+                !state.data.allMetadataFrozen,
+            "ALL_METADATA_FROZEN"
+        );
+```
 
 ### Vulnerability test
 The unit test for this vulnerability can be found in `ZigturAudit.js`, under the name `Token metadata can be changed even if allMetadataFrozen is true`.
 
 ### Solution
-**MISSING CONTENT**
+- Explanations: Modify the logical OR `||` operator by a logical AND `&&` operator in the require statement.
+- Fixed code:
+```solidity
+        require(
+            !state.data.tokenMetadataFrozen[_tokenConfig.tokenId] &&
+                !state.data.allMetadataFrozen,
+            "ALL_METADATA_FROZEN"
+        );
+```
 
 
 
@@ -402,3 +425,117 @@ A check must be set to avoid a misconfiguration from creator.
     }
 ```
 
+
+## LOW - A token configuration locking mechanism is missing
+
+**Vulnerability classification: Low**
+
+This is a remark about token configuration.
+
+### Explanations
+
+I think that a configuration locking mechanism is missing. The only way owner can lock the configuration is by sending ownership to `address(0)`.
+
+Creator of a child could want to lock all the configuration for a single token. Currently, only the token URI can be locked. A creator can't lock a token configuration without locking all tokens configuration (by sending ownership to `address(0)`).
+
+
+
+
+
+
+## LOW - HeyMint fees must be paid even if those fees are not used
+*NOTE: ZIGTUR - NEEDS UNIT TEST*
+
+In multiple functions, HeyMint fees must be paid even if those fees are not sent to HeyMint. The fees amount is set by HeyMint admins.
+
+Here is the list of all the functions that always verifies if fees are present, but only send them if fees are active (keep them otherwise):
+- `mintToken` (ExtensionB)
+- `presaleMint` (ExtensionC)
+- `giftTokens` (ExtensionE)
+- `burnToMint` (ExtensionF)
+
+:warning: *Note that `creditCardMint` function doesn't use the same pattern as other mint functions. It checks that `heymintFee > 0` instead of checking `state.cfg.heyMintFeeActive`.* :warning:
+
+
+:white_check_mark: `freeClaim` (ExtensionG) already implements the fix. :white_check_mark:
+
+### Vulnerable code
+*Note: Not all the vulnerable functions are detailed in this section. The list of those function has been given in last section.*
+
+#### mintToken
+- File: `HeyMintERC1155ExtensionB.sol`
+- Function: `mintToken`
+- Lines: `109-110, 131-134, 139-142`
+- Explanations: The require statement will check that `heyMintFee` has been included in 
+- Vulnerable code:
+```solidity
+        uint256 heymintFee = _numTokens * heymintFeePerToken();
+        uint256 publicPrice = publicPriceInWei(_tokenId);
+        
+        // ...
+
+        require(
+            msg.value == publicPrice * _numTokens + heymintFee,
+            "PAYMENT_INCORRECT"
+        );
+
+        // ...
+        
+        if (state.cfg.heyMintFeeActive) {
+            (bool success, ) = heymintPayoutAddress.call{value: heymintFee}("");
+            require(success, "HeyMint fee transfer failed");
+        }
+```
+
+#### giftTokens
+- File: `HeyMintERC1155ExtensionE.sol`
+- Function: `giftTokens`
+- Lines: `63-68`
+- Explanations: The require statement will check that `heyMintFee` has been included in 
+- Vulnerable code:
+```solidity
+        uint256 heymintFee = (totalMints * heymintFeePerToken()) / 10;
+        require(msg.value == heymintFee, "PAYMENT_INCORRECT");
+        if (state.cfg.heyMintFeeActive) {
+            (bool success, ) = heymintPayoutAddress.call{value: heymintFee}("");
+            require(success, "HeyMint fee transfer failed");
+        }
+```
+
+### Solution
+#### mintToken
+- Explanations: Set the require statement in an if/else block, to check if the right `msg.value` has been set.
+- Fixed code:
+```solidity
+        uint256 heymintFee = _numTokens * heymintFeePerToken();
+        uint256 publicPrice = publicPriceInWei(_tokenId);
+        
+        // ...
+
+        if (state.cfg.heyMintFeeActive) {
+            require(
+                msg.value == publicPrice * _numTokens + heymintFee,
+                "PAYMENT_INCORRECT"
+            );
+            (bool success, ) = heymintPayoutAddress.call{value: heymintFee}("");
+            require(success, "HeyMint fee transfer failed");
+        }
+        else {
+            require(
+                msg.value == publicPrice * _numTokens,
+                "PAYMENT_INCORRECT"
+            );
+        }
+```
+
+#### giftTokens
+- Explanations: Set the require statement in an if block, to check if the right `msg.value` has been set.
+- Fixed code:
+```solidity
+        if (state.cfg.heyMintFeeActive) {
+            uint256 heymintFee = (totalMints * heymintFeePerToken()) / 10;
+            require(msg.value == heymintFee, "PAYMENT_INCORRECT");
+            (bool success, ) = heymintPayoutAddress.call{value: heymintFee}("");
+            require(success, "HeyMint fee transfer failed");
+        }
+```
