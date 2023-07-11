@@ -441,10 +441,13 @@ Creator of a child could want to lock all the configuration for a single token. 
 
 
 
-
-
 ## LOW - HeyMint fees must be paid even if those fees are not used
-*NOTE: ZIGTUR - NEEDS UNIT TEST*
+
+**Vulnerability classification: Low**
+
+This is marked as low, because only HeyMint will be allowed to modify the fees.
+
+### Explanations
 
 In multiple functions, HeyMint fees must be paid even if those fees are not sent to HeyMint. The fees amount is set by HeyMint admins.
 
