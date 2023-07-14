@@ -61,9 +61,11 @@ When the fix is too heavy, no code proposal will be given. However, ways to solv
 | HIGH                              | [Presale users will not be able to mint all their public mint tokens](#high---presale-users-will-not-be-able-to-mint-all-their-public-mint-tokens)   |
 | HIGH                              | [Token metadata can be changed even if allMetadataFrozen is true](#high---token-metadata-can-be-changed-even-if-allmetadatafrozen-is-true)   |
 | MEDIUM                            | [Presale users can lose presale mints, if they use normal mint](#medium---presale-users-can-lose-presale-mints-if-they-use-normal-mint)   |
+| MEDIUM                            | [User can max out publicMintsAllowedPerAddress with burnToMint](#medium---user-can-max-out-publicmintsallowedperaddress-with-burntomint)   |
 | LOW                               | [Missing check in setTokenPresaleEndTime](#low---missing-check-in-settokenpresaleendtime)   |
 | LOW                               | [A token configuration locking mechanism is missing](#low---a-token-configuration-locking-mechanism-is-missing)   |
 | LOW                               | [HeyMint fees must be paid even if those fees are not used](#low---heymint-fees-must-be-paid-even-if-those-fees-are-not-used)   |
+| LOW                               | [Public Sale will not be set as inactive in creditCardMint](#low---public-sale-will-not-be-set-as-inactive-in-creditcardmint)   |
 
 # Findings
 
@@ -378,6 +380,43 @@ It is worth saying that this solution **is not** the most user-friendly one.
 
 
 
+
+## MEDIUM - User can max out publicMintsAllowedPerAddress with burnToMint
+
+**Vulnerability classification: Medium**
+
+This is marked as medium, because user needs to burn others tokens.
+
+### Explanations
+
+In the `burnToMint` function, there are no checks that user doesn't the number of public sale mints allowed per address.
+
+A user will be able to max out the number of allowed public sale mints.
+
+### Vulnerable code
+- File: `HeyMintERC1155ExtensionF.sol`
+- Function: `burnToMint`
+- Lines: `232-319`
+- Explanations: A check that `state.data.tokensMintedByAddress[msg.sender][_tokenId] + _tokensToMint <= state.tokens[_tokenId].publicMintsAllowedPerAddress` must be done, just like it is on other mint functions. If not, user will be able to max out `publicMintsAllowedPerAddress`.
+- Vulnerable code: All the `burnToMint` function, because a require is missing.
+
+### Vulnerability test
+The unit test for this vulnerability can be found in `ZigturAudit.js` under the name `User can max out publicMintsAllowedPerAddress with burnToMint`.
+
+### Solution
+- Explanations: Add a `require` statement to ensure that `publicMintsAllowedPerAddress` is not maxed out.
+- Fixed code:
+```solidity
+        require(
+            state.tokens[_tokenId].publicMintsAllowedPerAddress == 0 ||
+                state.data.tokensMintedByAddress[msg.sender][_tokenId] +
+                    _tokensToMint <=
+                state.tokens[_tokenId].publicMintsAllowedPerAddress,
+            "MAX_MINTS_FOR_ADDRESS_EXCEEDED"
+        );
+```
+
+
 ## LOW - Missing check in setTokenPresaleEndTime
 
 **Vulnerability classification: Low**
@@ -542,3 +581,45 @@ Here is the list of all the functions that always verifies if fees are present, 
             require(success, "HeyMint fee transfer failed");
         }
 ```
+
+## LOW - Public Sale will not be set as inactive in creditCardMint
+
+**Vulnerability classification: Low**
+
+This is marked as low, because other checks mitigate the issue.
+
+### Explanations
+
+In the `creditCardMint` function, if `maxSupply` is reached, the public sale will not be set as inactive because of an issue in the check
+
+The issue is mitigated because minting functions verify that future supply doesn't max out maxSupply.
+
+### Vulnerable code
+- File: `HeyMintERC1155ExtensionE.sol`
+- Function: `mintToken`
+- Lines: `163-168`
+- Explanations: The `if` block checks that `presaleMaxSupply != 0`, but it should verify `maxSupply`.
+- Vulnerable code:
+```solidity
+        if (
+            state.tokens[_tokenId].presaleMaxSupply != 0 &&
+            state.data.totalSupply[_tokenId] >= state.tokens[_tokenId].maxSupply
+        ) {
+            state.tokens[_tokenId].publicSaleActive = false;
+        }
+```
+
+### Solution
+- Explanations: Replace `presaleMaxSupply != 0` with `maxSupply != 0`.
+- Fixed code:
+```solidity
+        if (
+            state.tokens[_tokenId].maxSupply != 0 &&
+            state.data.totalSupply[_tokenId] >= state.tokens[_tokenId].maxSupply
+        ) {
+            state.tokens[_tokenId].publicSaleActive = false;
+        }
+```
+
+
+

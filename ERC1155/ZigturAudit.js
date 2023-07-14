@@ -112,6 +112,7 @@ const heyMintFee = ethers.utils.parseEther('0.0007')
 describe('HeyMintERC1155', async function () {
   let owner, signer, userA, userB
   let addressRelay, HeyMintERC1155Reference, heyMintERC1155Reference
+  let implContracts = []
   let childContractProxied,
     ownerChildContractProxied,
     signerChildContractProxied,
@@ -141,7 +142,7 @@ describe('HeyMintERC1155', async function () {
       'HeyMintERC1155ExtensionF',
       'HeyMintERC1155ExtensionG',
     ]
-    const implContracts = []
+    
     for (const contractName of implContractNames) {
       const Impl = await ethers.getContractFactory(contractName)
       const impl = await Impl.deploy({
@@ -622,7 +623,6 @@ describe('HeyMintERC1155', async function () {
       })
   })
 
-
   describe('upsertToken', async () => {
     it('Token metadata can be changed even if allMetadataFrozen is true', async () => {
       expect(await ownerChildContractProxied.freezeAllMetadata()).not.to.be.reverted
@@ -684,6 +684,83 @@ describe('HeyMintERC1155', async function () {
             tokenConfig1.tokenId
         )
         expect(settings.publicMintsAllowedPerAddress).to.lessThan(await childContractProxied.balanceOf(userA.address, tokenConfig1.tokenId));
+    })
+  })
+
+  describe('burnToMint', async () => {
+    it('User can max out publicMintsAllowedPerAddress with burnToMint', async () => {
+      const price = await childContractProxied.burnPaymentInWei(
+        tokenConfig1.tokenId
+      )
+      const heymintFee = await childContractProxied.heymintFeePerToken()
+      await ownerChildContractProxied.updateBurnTokens(
+        [tokenConfig1.tokenId],
+        [
+          [
+            {
+              ...burnTokenERC721Default,
+              contractAddress: ownerEnumerableERC721.address,
+            },
+            {
+              ...burnTokenERC1155Default,
+              contractAddress: ownerEnumerableERC1155.address,
+            },
+          ],
+        ]
+      )
+      await ownerChildContractProxied.updateMintsPerBurn(
+        tokenConfig1.tokenId,
+        1
+      )
+      await ownerChildContractProxied.setBurnClaimState(
+        tokenConfig1.tokenId,
+        true
+      )
+      await ownerEnumerableERC721.gift([userA.address], 100)
+      await ownerEnumerableERC721
+        .connect(userA)
+        .setApprovalForAll(childContractProxied.address, true)
+      await ownerEnumerableERC1155.giftTokens(1, [userA.address], [100])
+      await ownerEnumerableERC1155
+        .connect(userA)
+        .setApprovalForAll(childContractProxied.address, true)
+      
+      console.log("before normal mint")
+      // Set tokenPublicMintsAllowedPerAddress = 10
+      await ownerChildContractProxied.setTokenPublicMintsAllowedPerAddress(
+        tokenConfig1.tokenId,
+        10
+    )
+      // normal mint limit
+      await userAChildContractProxied.mintToken(tokenConfig1.tokenId, 10, {
+        value: price.add(heyMintFee).mul(10),
+      })
+      // max out limit with burnToMint
+      console.log("after normal mint")
+      expect(
+        await userAChildContractProxied.burnToMint(
+          tokenConfig1.tokenId,
+          [ownerEnumerableERC721.address, ownerEnumerableERC1155.address],
+          [[1], [1]],
+          1,
+          { value: price.add(heymintFee) }
+        )
+      ).to.not.be.reverted
+      // Verify that user's balance is more than publicMintsAllowedPerAddress
+      const [settings] = await childContractProxied.getTokenSettings(
+        tokenConfig1.tokenId
+      )
+      // Check that it maxed out
+      expect(settings.publicMintsAllowedPerAddress).to.lessThan(await childContractProxied.balanceOf(userA.address, tokenConfig1.tokenId));
+    })
+  })
+
+
+  describe('addressRelay', async () => {
+    it('Removing elements - Gas optimizations', async () => {
+      expect(await addressRelay.getAllImplAddressesAndSelectors()).not.to.be.reverted;
+      expect(await addressRelay.removeImplAddressAndAllSelectors(implContracts[1].implAddress)).not.to.be.reverted;
+      expect(await addressRelay.getAllImplAddressesAndSelectors()).not.to.be.reverted;
     })
   })
 
